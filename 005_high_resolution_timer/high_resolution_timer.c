@@ -1,13 +1,13 @@
 /***************************************************************************/ /**
- *  \file       driver.c
- *
- *  \details    Simple Linux device driver (Kernel Thread)
- *
- *  \author     EmbeTronicX
- *
- *  \Tested with Linux raspberrypi 5.10.27-v7l-embetronicx-custom+
- *
- *******************************************************************************/
+   \file       driver.c
+ 
+   \details    Simple Linux device driver (High Resolution Timer)
+ 
+   \author     EmbeTronicX
+ 
+   \Tested with Linux raspberrypi 5.10.27-v7l-embetronicx-custom+
+ 
+ ******************************************************************************/
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -15,12 +15,16 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/slab.h>	   //kmalloc()
-#include <linux/uaccess.h> //copy_to/from_user()
-#include <linux/kthread.h> //kernel threads
-#include <linux/sched.h>   //task_struct
-#include <linux/delay.h>
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
 #include <linux/err.h>
+
+// Timer Variable
+#define TIMEOUT_NSEC (1000000000L) // 1 second in nano seconds
+#define TIMEOUT_SEC (4)			   // 4 seconds
+
+static struct hrtimer etx_hr_timer;
+static unsigned int count = 0;
 
 dev_t dev = 0;
 static struct class *dev_class;
@@ -29,11 +33,6 @@ static struct cdev etx_cdev;
 static int __init etx_driver_init(void);
 static void __exit etx_driver_exit(void);
 
-static struct task_struct *etx_thread;
-
-/*
-** Function Prototypes
-*/
 /*************** Driver functions **********************/
 static int etx_open(struct inode *inode, struct file *file);
 static int etx_release(struct inode *inode, struct file *file);
@@ -43,25 +42,7 @@ static ssize_t etx_write(struct file *filp,
 						 const char *buf, size_t len, loff_t *off);
 /******************************************************/
 
-int thread_function(void *pv);
-
-/*
-** Thread
-*/
-int thread_function(void *pv)
-{
-	int i = 0;
-	while (!kthread_should_stop())
-	{
-		pr_info("In EmbeTronicX Thread Function %d\n", i++);
-		msleep(1000);
-	}
-	return 0;
-}
-
-/*
-** File operation sturcture
-*/
+// File operation structure
 static struct file_operations fops =
 	{
 		.owner = THIS_MODULE,
@@ -70,6 +51,15 @@ static struct file_operations fops =
 		.open = etx_open,
 		.release = etx_release,
 };
+
+// Timer Callback function. This will be called when timer expires
+enum hrtimer_restart timer_callback(struct hrtimer *timer)
+{
+	/* do your timer stuff here */
+	pr_info("Timer Callback function Called [%d]\n", count++);
+	hrtimer_forward_now(timer, ktime_set(TIMEOUT_SEC, TIMEOUT_NSEC));
+	return HRTIMER_RESTART;
+}
 
 /*
 ** This function will be called when we open the Device file
@@ -95,8 +85,7 @@ static int etx_release(struct inode *inode, struct file *file)
 static ssize_t etx_read(struct file *filp,
 						char __user *buf, size_t len, loff_t *off)
 {
-	pr_info("Read function\n");
-
+	pr_info("Read Function\n");
 	return 0;
 }
 
@@ -106,7 +95,7 @@ static ssize_t etx_read(struct file *filp,
 static ssize_t etx_write(struct file *filp,
 						 const char __user *buf, size_t len, loff_t *off)
 {
-	pr_info("Write Function\n");
+	pr_info("Write function\n");
 	return len;
 }
 
@@ -115,8 +104,10 @@ static ssize_t etx_write(struct file *filp,
 */
 static int __init etx_driver_init(void)
 {
+	ktime_t ktime;
+
 	/*Allocating Major number*/
-	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev_High_Resolution_Timer")) < 0)
 	{
 		pr_err("Cannot allocate major number\n");
 		return -1;
@@ -134,47 +125,30 @@ static int __init etx_driver_init(void)
 	}
 
 	/*Creating struct class*/
-	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class")))
+	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class_high_resolution_timer")))
 	{
 		pr_err("Cannot create the struct class\n");
 		goto r_class;
 	}
 
 	/*Creating device*/
-	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device_high_resolution_timer")))
 	{
-		pr_err("Cannot create the Device \n");
+		pr_err("Cannot create the Device 1\n");
 		goto r_device;
 	}
 
-	etx_thread = kthread_create(thread_function, NULL, "eTx Thread");
-	if (etx_thread)
-	{
-		wake_up_process(etx_thread);
-	}
-	else
-	{
-		pr_err("Cannot create kthread\n");
-		goto r_device;
-	}
-#if 0
-        /* You can use this method also to create and run the thread */
-        etx_thread = kthread_run(thread_function,NULL,"eTx Thread");
-        if(etx_thread) {
-            pr_info("Kthread Created Successfully...\n");
-        } else {
-            pr_err("Cannot create kthread\n");
-             goto r_device;
-        }
-#endif
+	ktime = ktime_set(TIMEOUT_SEC, TIMEOUT_NSEC);
+	hrtimer_init(&etx_hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	etx_hr_timer.function = &timer_callback;
+	hrtimer_start(&etx_hr_timer, ktime, HRTIMER_MODE_REL);
+
 	pr_info("Device Driver Insert...Done!!!\n");
 	return 0;
-
 r_device:
 	class_destroy(dev_class);
 r_class:
 	unregister_chrdev_region(dev, 1);
-	cdev_del(&etx_cdev);
 	return -1;
 }
 
@@ -183,18 +157,19 @@ r_class:
 */
 static void __exit etx_driver_exit(void)
 {
-	kthread_stop(etx_thread);
+	// stop the timer
+	hrtimer_cancel(&etx_hr_timer);
 	device_destroy(dev_class, dev);
 	class_destroy(dev_class);
 	cdev_del(&etx_cdev);
 	unregister_chrdev_region(dev, 1);
-	pr_info("Device Driver Remove...Done!!\n");
+	pr_info("Device Driver Remove...Done!!!\n");
 }
 
 module_init(etx_driver_init);
 module_exit(etx_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
-MODULE_DESCRIPTION("A simple device driver - Kernel Thread");
-MODULE_VERSION("1.14");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
+MODULE_DESCRIPTION("A simple device driver - High Resolution Timer");
+MODULE_VERSION("1.22");

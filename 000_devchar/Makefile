@@ -1,5 +1,8 @@
-obj-m += driver.o
- 
+obj-m += devchar.o
+MCFLAGS += -std=gnu11
+ccflags-y += -Og -ggdb ${MCFLAGS}
+CC += ${MCFLAGS}
+
 ifdef ARCH
 	#You can update your Beaglebone path here.
 	KDIR = /home/embetronicx/BBG/tmp/lib/modules/5.10.65/build

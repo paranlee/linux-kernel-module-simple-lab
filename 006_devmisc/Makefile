@@ -1,5 +1,8 @@
 obj-m += misc_driver.o
- 
+MCFLAGS += -std=gnu11
+ccflags-y += -Og -ggdb ${MCFLAGS}
+CC += ${MCFLAGS}
+
 KDIR = /lib/modules/$(shell uname -r)/build
  
  

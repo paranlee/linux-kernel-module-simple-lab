@@ -1,13 +1,13 @@
 /***************************************************************************/ /**
-   \file       driver.c
- 
-   \details    Simple Linux device driver (High Resolution Timer)
- 
-   \author     EmbeTronicX
- 
-   \Tested with Linux raspberrypi 5.10.27-v7l-embetronicx-custom+
- 
- ******************************************************************************/
+ *  \file       driver.c
+ *
+ *  \details    Simple Linux device driver (Kernel Timer)
+ *
+ *  \author     EmbeTronicX
+ *
+ *  \Tested with Linux raspberrypi 5.10.27-v7l-embetronicx-custom+
+ *
+ *******************************************************************************/
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -15,15 +15,14 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/hrtimer.h>
-#include <linux/ktime.h>
+#include <linux/timer.h>
+#include <linux/jiffies.h>
 #include <linux/err.h>
 
 // Timer Variable
-#define TIMEOUT_NSEC (1000000000L) // 1 second in nano seconds
-#define TIMEOUT_SEC (4)			   // 4 seconds
+#define TIMEOUT 5000 // milliseconds
 
-static struct hrtimer etx_hr_timer;
+static struct timer_list etx_timer;
 static unsigned int count = 0;
 
 dev_t dev = 0;
@@ -36,10 +35,8 @@ static void __exit etx_driver_exit(void);
 /*************** Driver functions **********************/
 static int etx_open(struct inode *inode, struct file *file);
 static int etx_release(struct inode *inode, struct file *file);
-static ssize_t etx_read(struct file *filp,
-						char __user *buf, size_t len, loff_t *off);
-static ssize_t etx_write(struct file *filp,
-						 const char *buf, size_t len, loff_t *off);
+static ssize_t etx_read(struct file *filp, char __user *buf, size_t len, loff_t *off);
+static ssize_t etx_write(struct file *filp, const char *buf, size_t len, loff_t *off);
 /******************************************************/
 
 // File operation structure
@@ -53,12 +50,16 @@ static struct file_operations fops =
 };
 
 // Timer Callback function. This will be called when timer expires
-enum hrtimer_restart timer_callback(struct hrtimer *timer)
+void timer_callback(struct timer_list *data)
 {
 	/* do your timer stuff here */
 	pr_info("Timer Callback function Called [%d]\n", count++);
-	hrtimer_forward_now(timer, ktime_set(TIMEOUT_SEC, TIMEOUT_NSEC));
-	return HRTIMER_RESTART;
+
+	/*
+	   Re-enable timer. Because this function will be called only first time.
+	   If we re-enable this will work like periodic timer.
+	*/
+	mod_timer(&etx_timer, jiffies + msecs_to_jiffies(TIMEOUT));
 }
 
 /*
@@ -104,10 +105,8 @@ static ssize_t etx_write(struct file *filp,
 */
 static int __init etx_driver_init(void)
 {
-	ktime_t ktime;
-
 	/*Allocating Major number*/
-	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev_Timer")) < 0)
 	{
 		pr_err("Cannot allocate major number\n");
 		return -1;
@@ -125,23 +124,24 @@ static int __init etx_driver_init(void)
 	}
 
 	/*Creating struct class*/
-	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class")))
+	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class_timer")))
 	{
 		pr_err("Cannot create the struct class\n");
 		goto r_class;
 	}
 
 	/*Creating device*/
-	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device_timer")))
 	{
 		pr_err("Cannot create the Device 1\n");
 		goto r_device;
 	}
 
-	ktime = ktime_set(TIMEOUT_SEC, TIMEOUT_NSEC);
-	hrtimer_init(&etx_hr_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	etx_hr_timer.function = &timer_callback;
-	hrtimer_start(&etx_hr_timer, ktime, HRTIMER_MODE_REL);
+	/* setup your timer to call my_timer_callback */
+	timer_setup(&etx_timer, timer_callback, 0); // If you face some issues and using older kernel version, then you can try setup_timer API(Change Callback function's argument to unsingned long instead of struct timer_list *.
+
+	/* setup timer interval to based on TIMEOUT Macro */
+	mod_timer(&etx_timer, jiffies + msecs_to_jiffies(TIMEOUT));
 
 	pr_info("Device Driver Insert...Done!!!\n");
 	return 0;
@@ -157,8 +157,8 @@ r_class:
 */
 static void __exit etx_driver_exit(void)
 {
-	// stop the timer
-	hrtimer_cancel(&etx_hr_timer);
+	/* remove kernel timer when unloading module */
+	del_timer(&etx_timer);
 	device_destroy(dev_class, dev);
 	class_destroy(dev_class);
 	cdev_del(&etx_cdev);
@@ -170,6 +170,6 @@ module_init(etx_driver_init);
 module_exit(etx_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
-MODULE_DESCRIPTION("A simple device driver - High Resolution Timer");
-MODULE_VERSION("1.22");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
+MODULE_DESCRIPTION("A simple device driver - Kernel Timer");
+MODULE_VERSION("1.21");

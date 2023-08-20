@@ -104,6 +104,6 @@ module_init(misc_init)
 module_exit(misc_exit)
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
 MODULE_DESCRIPTION("A simple device driver - Misc Driver");
 MODULE_VERSION("1.29");

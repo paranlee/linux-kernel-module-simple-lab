@@ -1,5 +1,5 @@
 /***************************************************************************/ /**
- *  \file       driver.c
+ *  \file       workqueue.c
  *
  *  \details    Simple Linux device driver (Global Workqueue - Dynamic method)
  *
@@ -151,7 +151,7 @@ static ssize_t etx_write(struct file *filp,
 static int __init etx_driver_init(void)
 {
 	/*Allocating Major number*/
-	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev_WorkQueue")) < 0)
 	{
 		pr_info("Cannot allocate major number\n");
 		return -1;
@@ -169,21 +169,21 @@ static int __init etx_driver_init(void)
 	}
 
 	/*Creating struct class*/
-	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class")))
+	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class_workqueue")))
 	{
 		pr_info("Cannot create the struct class\n");
 		goto r_class;
 	}
 
 	/*Creating device*/
-	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device_workqueue")))
 	{
 		pr_info("Cannot create the Device 1\n");
 		goto r_device;
 	}
 
 	/*Creating a directory in /sys/kernel/ */
-	kobj_ref = kobject_create_and_add("etx_sysfs", kernel_kobj);
+	kobj_ref = kobject_create_and_add("etx_sysfs_workqueue", kernel_kobj);
 
 	/*Creating sysfs file for etx_value*/
 	if (sysfs_create_file(kobj_ref, &etx_attr.attr))
@@ -191,7 +191,7 @@ static int __init etx_driver_init(void)
 		pr_err("Cannot create sysfs file......\n");
 		goto r_sysfs;
 	}
-	if (request_irq(IRQ_NO, irq_handler, IRQF_SHARED, "etx_device", (void *)(irq_handler)))
+	if (request_irq(IRQ_NO, irq_handler, IRQF_SHARED, "etx_device_workqueue", (void *)(irq_handler)))
 	{
 		pr_info("my_device: cannot register IRQ ");
 		goto irq;
@@ -237,6 +237,6 @@ module_init(etx_driver_init);
 module_exit(etx_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
 MODULE_DESCRIPTION("Simple Linux device driver (Global Workqueue - Dynamic method)");
 MODULE_VERSION("1.11");

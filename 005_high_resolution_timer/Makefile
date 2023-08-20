@@ -1,5 +1,8 @@
-obj-m += driver.o
- 
+obj-m += high_resolution_timer.o
+MCFLAGS += -std=gnu11
+ccflags-y += -Og -ggdb ${MCFLAGS}
+CC += ${MCFLAGS}
+
 KDIR = /lib/modules/$(shell uname -r)/build
  
  

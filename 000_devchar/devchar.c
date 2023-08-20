@@ -26,7 +26,7 @@ static struct class *dev_class;
 static int __init hello_world_init(void)
 {
 	/*Allocating Major number*/
-	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	if ((alloc_chrdev_region(&dev, 0, 1, "etx_DevChar")) < 0)
 	{
 		pr_err("Cannot allocate major number for device\n");
 		return -1;
@@ -34,7 +34,7 @@ static int __init hello_world_init(void)
 	pr_info("Major = %d Minor = %d \n", MAJOR(dev), MINOR(dev));
 
 	/*Creating struct class*/
-	dev_class = class_create(THIS_MODULE, "etx_class");
+	dev_class = class_create(THIS_MODULE, "etx_class_devchar");
 	if (IS_ERR(dev_class))
 	{
 		pr_err("Cannot create the struct class for device\n");
@@ -42,7 +42,7 @@ static int __init hello_world_init(void)
 	}
 
 	/*Creating device*/
-	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device_devchar")))
 	{
 		pr_err("Cannot create the Device\n");
 		goto r_device;
@@ -72,6 +72,6 @@ module_init(hello_world_init);
 module_exit(hello_world_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
 MODULE_DESCRIPTION("Simple linux driver (Automatically Creating a Device file)");
 MODULE_VERSION("1.2");

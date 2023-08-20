@@ -225,7 +225,7 @@ static long etx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static int __init etx_driver_init(void)
 {
 	/*Allocating Major number*/
-	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev")) < 0)
+	if ((alloc_chrdev_region(&dev, 0, 1, "etx_Dev_ProcFs")) < 0)
 	{
 		pr_info("Cannot allocate major number\n");
 		return -1;
@@ -243,14 +243,14 @@ static int __init etx_driver_init(void)
 	}
 
 	/*Creating struct class*/
-	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class")))
+	if (IS_ERR(dev_class = class_create(THIS_MODULE, "etx_class_procfs")))
 	{
 		pr_info("Cannot create the struct class\n");
 		goto r_class;
 	}
 
 	/*Creating device*/
-	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device")))
+	if (IS_ERR(device_create(dev_class, NULL, dev, NULL, "etx_device_procfs")))
 	{
 		pr_info("Cannot create the Device 1\n");
 		goto r_device;
@@ -265,7 +265,7 @@ static int __init etx_driver_init(void)
 		goto r_device;
 	}
 
-	/*Creating Proc entry under "/proc/etx/" */
+	/*Creating Proc entry under "/proc/etx_procfs/" */
 	proc_create("etx_proc", 0666, parent, &proc_fops);
 
 	pr_info("Device Driver Insert...Done!!!\n");
@@ -300,6 +300,6 @@ module_init(etx_driver_init);
 module_exit(etx_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>");
+MODULE_AUTHOR("EmbeTronicX <embetronicx@gmail.com>; Paran Lee <p4ranlee@gmail.com>");
 MODULE_DESCRIPTION("Simple Linux device driver (procfs)");
 MODULE_VERSION("1.6");
